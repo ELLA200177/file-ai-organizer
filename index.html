@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>文件AI整理工具</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; font-family:'Segoe UI',-apple-system,sans-serif; }
+  body {
+    background:#F5F1E8; color:#3D382F; height:100vh; display:flex; flex-direction:column;
+    overflow:hidden; padding:14px;
+  }
+
+  /* ===== 顶部卡片 ===== */
+  .topbar {
+    background:#FDFBF6; border-radius:14px; padding:14px 18px; margin-bottom:12px;
+    box-shadow:0 2px 12px rgba(120,100,60,0.08); border:1px solid #EDE6D6; flex-shrink:0;
+  }
+  .top-row { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
+  .folder-path { font-size:13px; color:#8A8068; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .folder-path b { color:#7A9B6E; font-weight:600; }
+
+  .btn { border-radius:10px; padding:7px 14px; font-size:13px; cursor:pointer; border:none; font-weight:500; transition:all .15s; }
+  .btn:disabled { opacity:.5; cursor:not-allowed; }
+  .btn-ghost { background:transparent; color:#6B6354; border:1.5px solid #DDD4C0; }
+  .btn-ghost:hover:not(:disabled) { background:#F0EADB; }
+  .search {
+    background:#F5F1E8; border:1.5px solid #DDD4C0; border-radius:10px;
+    padding:7px 12px; color:#3D382F; font-size:13px; width:220px; outline:none;
+  }
+  .search:focus { border-color:#7A9B6E; }
+
+  .action-row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .btn-primary { background:#7A9B6E; color:white; }
+  .btn-primary:hover:not(:disabled) { background:#6B8C5F; }
+  .btn-dark { background:#5C5344; color:white; }
+  .btn-dark:hover:not(:disabled) { background:#4D4538; }
+  .btn-success { background:#C98A5E; color:white; }
+  .btn-success:hover:not(:disabled) { background:#B87A4F; }
+  .divider { width:1px; height:22px; background:#DDD4C0; margin:0 4px; }
+  .checkbox-label { font-size:13px; color:#8A8068; display:flex; align-items:center; gap:5px; cursor:pointer; }
+  .status { font-size:12px; color:#B0A58E; margin-left:auto; }
+
+  .progress-wrap { margin-top:10px; height:4px; background:#F0EADB; border-radius:2px; overflow:hidden; display:none; }
+  .progress-wrap.show { display:block; }
+  .progress-bar { height:100%; background:#7A9B6E; width:0; transition:width .2s; border-radius:2px; }
+
+  /* ===== 主区域 ===== */
+  .main { flex:1; display:flex; gap:12px; overflow:hidden; min-height:0; }
+  .panel {
+    background:#FDFBF6; border-radius:14px; border:1px solid #EDE6D6;
+    box-shadow:0 2px 12px rgba(120,100,60,0.07); display:flex; flex-direction:column; overflow:hidden;
+  }
+  .left { flex:3; }
+  .right { flex:2; }
+  .panel-title { font-size:13px; font-weight:600; padding:12px 16px 8px; color:#3D382F; flex-shrink:0; }
+
+  /* 文件表格 */
+  .table-head, .table-row {
+    display:grid; grid-template-columns:40px 1.4fr 1.4fr 1fr; gap:8px;
+    padding:8px 16px; align-items:center; font-size:13px;
+  }
+  .table-head { color:#9B8F78; font-size:11px; background:#F8F4EA; font-weight:500; }
+  .table-body { flex:1; overflow-y:auto; }
+  .table-row { border-top:1px solid #F0EADB; cursor:pointer; color:#5C5344; }
+  .table-row:hover { background:#F8F4EA; }
+  .table-row.selected { background:#EAF0E3; }
+  .table-row.selected:hover { background:#EAF0E3; }
+  .table-row .orig { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .table-row .newname { color:#3D382F; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .check { width:17px; height:17px; border:2px solid #B5C9A8; border-radius:6px; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:12px; color:white; flex-shrink:0; }
+  .check.on { background:#7A9B6E; border-color:#7A9B6E; }
+  .folder-tag { font-size:11px; display:inline-block; padding:2px 8px; border-radius:6px; background:#EFEAE0; color:#7A7264; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .folder-tag.filled { background:#EAF0E3; color:#5C7A4E; }
+
+  /* 预览 */
+  .preview-head { padding:10px 16px; border-top:1px solid #F0EADB; display:flex; justify-content:space-between; align-items:center; background:#FAF6EE; flex-shrink:0; }
+  .preview-name { font-size:11px; color:#9B8F78; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:70%; }
+  .btn-warn { background:#E8C07D; color:#5C4A28; padding:6px 12px; font-size:12px; }
+  .btn-warn:hover { background:#DDB36E; }
+  .preview-body { flex:1; padding:16px; overflow:auto; font-size:13px; line-height:1.8; color:#5C5344; white-space:pre-wrap; word-break:break-all; }
+  .preview-body img { max-width:100%; border-radius:8px; }
+  .preview-body.empty { color:#B0A58E; display:flex; align-items:center; justify-content:center; height:100%; }
+
+  /* 日志 */
+  .logbar {
+    background:#FDFBF6; border-radius:14px; border:1px solid #EDE6D6;
+    box-shadow:0 2px 12px rgba(120,100,60,0.06); padding:10px 16px; margin-top:12px; flex-shrink:0;
+  }
+  .log-title { font-size:11px; color:#9B8F78; margin-bottom:4px; font-weight:600; }
+  .log { font-family:Consolas,monospace; font-size:11px; color:#8A8068; line-height:1.6; height:54px; overflow-y:auto; }
+
+  /* 弹窗 */
+  .modal-mask { position:fixed; inset:0; background:rgba(60,50,30,0.3); display:none; align-items:center; justify-content:center; z-index:100; }
+  .modal-mask.show { display:flex; }
+  .modal { background:#FDFBF6; border-radius:14px; border:1px solid #EDE6D6; box-shadow:0 8px 32px rgba(120,100,60,0.2); padding:20px; width:480px; max-height:80vh; display:flex; flex-direction:column; }
+  .modal h3 { font-size:15px; margin-bottom:12px; color:#3D382F; }
+  .modal h3.drag-handle { cursor:move; user-select:none; }
+  .modal textarea { width:100%; flex:1; min-height:200px; background:#F5F1E8; border:1.5px solid #DDD4C0; border-radius:10px; padding:10px; font-size:13px; font-family:Consolas,monospace; resize:none; outline:none; color:#3D382F; }
+  .modal .hint { font-size:11px; color:#B0A58E; margin:8px 0; line-height:1.6; }
+  .modal .ai-cats { font-size:12px; color:#7A9B6E; background:#EAF0E3; padding:8px 10px; border-radius:8px; margin-top:10px; line-height:1.6; }
+  .modal-btns { display:flex; gap:8px; justify-content:flex-end; margin-top:14px; }
+  .modal .api-input { width:100%; background:#F5F1E8; border:1.5px solid #DDD4C0; border-radius:10px; padding:10px; font-size:13px; font-family:Consolas,monospace; outline:none; color:#3D382F; }
+  .modal .api-input:focus { border-color:#7A9B6E; }
+  .modal .field { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+  .modal .field > span { width:60px; font-size:12px; color:#8A8068; flex-shrink:0; }
+  .modal .field .api-input { width:auto; flex:1; }
+  .modal select.api-input { cursor:pointer; }
+
+  /* 搜索结果弹窗 */
+  #searchModal .modal { width:640px; }
+  .search-item { padding:10px 12px; border-bottom:1px solid #F0EADB; cursor:pointer; border-radius:8px; }
+  .search-item:hover { background:#F8F4EA; }
+  .search-path { font-size:13px; color:#3D382F; margin-bottom:3px; }
+  .search-reason { font-size:11px; color:#9B8F78; }
+  .search-list { flex:1; overflow-y:auto; }
+  .empty-tip { text-align:center; color:#B0A58E; padding:30px; font-size:13px; }
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="top-row">
+      <span class="folder-path">📁 <b id="folderPath">加载中…</b></span>
+      <input class="search" id="searchInput" placeholder="想找什么？如：上个月的报价单">
+      <button class="btn btn-primary" id="searchBtn">搜索</button>
+      <button class="btn btn-ghost" id="chooseFolderBtn">选择文件夹</button>
+    </div>
+    <div class="action-row">
+      <button class="btn btn-primary" id="scanBtn">① 扫描文件</button>
+      <button class="btn btn-dark" id="analyzeBtn" disabled>② AI分析建议</button>
+      <button class="btn btn-success" id="archiveBtn" disabled>③ 执行归档</button>
+      <button class="btn btn-ghost" id="undoBtn" disabled>↩ 撤销上次归档</button>
+      <div class="divider"></div>
+      <button class="btn btn-ghost" id="selectAllBtn">全选</button>
+      <button class="btn btn-ghost" id="deselectAllBtn">清空</button>
+      <button class="btn btn-ghost" id="categoryBtn">分类设置</button>
+      <button class="btn btn-ghost" id="apiBtn">API 设置</button>
+      <label class="checkbox-label"><input type="checkbox" id="keepNameCheck"> 保留原文件名</label>
+      <span class="status" id="statusText">就绪</span>
+    </div>
+    <div class="progress-wrap" id="progressWrap"><div class="progress-bar" id="progressBar"></div></div>
+  </div>
+
+  <div class="main">
+    <div class="panel left">
+      <div class="panel-title">📄 文件列表</div>
+      <div class="table-head">
+        <span>选</span><span>原文件名</span><span>AI建议新名字</span><span>归属文件夹</span>
+      </div>
+      <div class="table-body" id="fileTable"></div>
+    </div>
+
+    <div class="panel right">
+      <div class="panel-title">👁 预览</div>
+      <div class="preview-head">
+        <span class="preview-name" id="previewName">（选中左侧文件后预览）</span>
+        <button class="btn btn-warn" id="openBtn">打开原文件</button>
+      </div>
+      <div class="preview-body empty" id="previewBody">选中左侧文件查看预览</div>
+    </div>
+  </div>
+
+  <div class="logbar">
+    <div class="log-title">📋 操作日志</div>
+    <div class="log" id="logBox"></div>
+  </div>
+
+  <!-- 分类设置弹窗 -->
+  <div class="modal-mask" id="categoryModal">
+    <div class="modal">
+      <h3 class="drag-handle">📋 分类设置</h3>
+      <div class="hint">自定义分类体系（每行一个分类名）。留空则自动使用当前文件夹下的现有文件夹。</div>
+      <textarea id="categoryText" placeholder="例如：&#10;报销&#10;周报&#10;实验数据&#10;参考文献"></textarea>
+      <div class="ai-cats" id="aiCatsBox">AI自动积累的分类：（暂无）</div>
+      <div class="modal-btns">
+        <button class="btn btn-ghost" id="catCancelBtn">取消</button>
+        <button class="btn btn-primary" id="catSaveBtn">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- API 设置弹窗 -->
+  <div class="modal-mask" id="apiModal">
+    <div class="modal">
+      <h3 class="drag-handle">🔑 API 设置</h3>
+      <div class="hint">选择 AI 服务商并使用你自己的 Key（按量计费）。配置只保存在本机 ~/.fileai/config.json。</div>
+      <div class="field"><span>服务商</span><select id="providerSelect" class="api-input"></select></div>
+      <div class="field"><span>接口地址</span><input class="api-input" id="apiBaseUrl" placeholder="https://..."></div>
+      <div class="field"><span>模型</span><input class="api-input" id="apiModel" placeholder="模型名"></div>
+      <div class="field" id="apiKeyField"><span>API Key</span><input type="password" class="api-input" id="apiKeyInput" placeholder="sk-..."></div>
+      <div class="hint" id="providerNote"></div>
+      <div class="ai-cats" id="apiStatusBox">当前状态：未配置</div>
+      <div class="modal-btns">
+        <button class="btn btn-ghost" id="testConnBtn">测试连接</button>
+        <button class="btn btn-ghost" id="apiCancelBtn">取消</button>
+        <button class="btn btn-primary" id="apiSaveBtn">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 搜索结果弹窗 -->
+  <div class="modal-mask" id="searchModal">
+    <div class="modal">
+      <h3 id="searchTitle">搜索结果</h3>
+      <div class="search-list" id="searchList"><div class="empty-tip">输入关键词开始搜索</div></div>
+      <div class="modal-btns">
+        <button class="btn btn-ghost" id="searchCloseBtn">关闭</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+let api = null;
+let results = [];       // 文件结果数组
+let currentFolder = "";
+let selectedIdx = -1;   // 当前预览的行
+
+const $ = id => document.getElementById(id);
+
+// HTML 转义：防止文件名/内容里的特殊字符注入页面
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c =>
+    ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+}
+
+// ===== pywebview ready =====
+window.addEventListener('pywebviewready', async () => {
+  api = window.pywebview.api;
+  const init = await api.init();
+  currentFolder = init.current_folder;
+  $('folderPath').textContent = currentFolder;
+  pushLog('已加载AI历史分类（' + init.ai_categories.length + '个）');
+  if (!init.api_configured) {
+    pushLog('⚠️ 还没配置 AI 服务商，请点「API 设置」填写后再使用 AI 功能');
+    $('apiModal').classList.add('show');
+  }
+  const u = await api.can_undo();
+  setUndoBtn(u.can_undo);
+});
+
+// ===== 后端推送的回调 =====
+window.on_log = (msg) => {
+  const box = $('logBox');
+  box.innerHTML += esc(msg) + '<br>';
+  box.scrollTop = box.scrollHeight;
+};
+window.on_status = (text) => { $('statusText').textContent = text; };
+window.on_progress = (cur, total) => {
+  $('progressWrap').classList.add('show');
+  $('progressBar').style.width = (cur/total*100) + '%';
+};
+window.on_analyze_row = (i, item) => {
+  results[i] = item;
+  renderRow(i, item);
+};
+window.on_analyze_done = (newResults) => {
+  results = newResults;
+  renderTable();
+  $('progressWrap').classList.remove('show');
+  setAnalyzeBtn(true, '② AI分析建议');
+  setScanBtn(true);
+  setArchiveBtn(true);
+};
+window.on_search_results = (query, matched) => {
+  $('searchTitle').textContent = '搜索结果：' + query + '（' + matched.length + '个，双击打开）';
+  const list = $('searchList');
+  if (!matched.length) {
+    list.innerHTML = '<div class="empty-tip">没找到匹配的文件</div>';
+  } else {
+    list.innerHTML = matched.map((m,i) =>
+      `<div class="search-item" data-full="${esc(m.full_path)}">
+        <div class="search-path">${esc(m.path)}</div>
+        <div class="search-reason">${esc(m.reason||'')}</div>
+      </div>`).join('');
+    list.querySelectorAll('.search-item').forEach(el => {
+      el.addEventListener('dblclick', () => {
+        api.open_path(el.getAttribute('data-full'));
+      });
+    });
+  }
+  $('searchModal').classList.add('show');
+};
+window.on_archive_done = (log, success) => {
+  setArchiveBtn(true, '③ 执行归档');
+  setUndoBtn(true);
+  alert('归档完成！成功移动 ' + success + ' 个文件。');
+};
+
+// ===== 工具函数 =====
+function pushLog(msg) { window.on_log('[' + new Date().toTimeString().slice(0,8) + '] ' + msg); }
+
+function setScanBtn(enabled) { $('scanBtn').disabled = !enabled; }
+function setAnalyzeBtn(enabled, text) {
+  const b = $('analyzeBtn');
+  b.disabled = !enabled;
+  if (text) b.textContent = text;
+}
+function setArchiveBtn(enabled, text) {
+  const b = $('archiveBtn');
+  b.disabled = !enabled;
+  if (text) b.textContent = text;
+}
+function setUndoBtn(enabled) { $('undoBtn').disabled = !enabled; }
+
+function renderRow(i, item) {
+  const row = document.querySelector(`.table-row[data-idx="${i}"]`);
+  if (!row) return;
+  row.querySelector('.check').className = 'check' + (item.selected ? ' on' : '');
+  row.querySelector('.check').textContent = item.selected ? '✓' : '';
+  row.querySelector('.orig').textContent = item.original_name;
+  row.querySelector('.newname').textContent = item.new_name;
+  const tag = row.querySelector('.folder-tag');
+  tag.textContent = item.target_folder || '';
+  tag.className = 'folder-tag' + (item.target_folder ? ' filled' : '');
+}
+
+function renderTable() {
+  const body = $('fileTable');
+  body.innerHTML = '';
+  results.forEach((item, i) => {
+    const row = document.createElement('div');
+    row.className = 'table-row' + (i === selectedIdx ? ' selected' : '');
+    row.dataset.idx = i;
+    row.innerHTML = `
+      <span class="check ${item.selected?'on':''}">${item.selected?'✓':''}</span>
+      <span class="orig">${esc(item.original_name)}</span>
+      <span class="newname">${esc(item.new_name)}</span>
+      <span><span class="folder-tag ${item.target_folder?'filled':''}">${esc(item.target_folder||'')}</span></span>
+    `;
+    // 勾选
+    row.querySelector('.check').addEventListener('click', (e) => {
+      e.stopPropagation();
+      item.selected = !item.selected;
+      api.toggle_select(i, item.selected);
+      renderRow(i, item);
+    });
+    // 选中行 → 预览
+    row.addEventListener('click', () => selectRow(i));
+    // 双击编辑新名字或文件夹
+    row.querySelector('.newname').addEventListener('dblclick', (e) => {
+      e.stopPropagation();
+      editCell(i, 'new_name', item.new_name);
+    });
+    row.querySelector('.folder-tag').addEventListener('dblclick', (e) => {
+      e.stopPropagation();
+      editCell(i, 'target_folder', item.target_folder);
+    });
+    body.appendChild(row);
+  });
+}
+
+function editCell(i, field, currentVal) {
+  const v = prompt('修改' + (field==='new_name'?'建议新名字':'归属文件夹') + '：', currentVal);
+  if (v !== null && v.trim()) {
+    api.update_result(i, field, v.trim());
+    results[i][field] = v.trim();
+    renderRow(i, results[i]);
+  }
+}
+
+async function selectRow(i) {
+  selectedIdx = i;
+  document.querySelectorAll('.table-row').forEach(r => r.classList.remove('selected'));
+  document.querySelector(`.table-row[data-idx="${i}"]`).classList.add('selected');
+  const item = results[i];
+  $('previewName').textContent = item.original_name;
+  $('previewBody').className = 'preview-body';
+  $('previewBody').textContent = '加载中...';
+  const preview = await api.get_preview(item.original_name);
+  if (preview.type === 'image') {
+    $('previewBody').innerHTML = `<img src="${preview.content}">`;
+  } else {
+    $('previewBody').textContent = preview.content;
+  }
+}
+
+// ===== 按钮事件 =====
+$('chooseFolderBtn').onclick = async () => {
+  const r = await api.choose_folder();
+  if (r.ok) {
+    currentFolder = r.folder;
+    $('folderPath').textContent = currentFolder;
+    results = [];
+    renderTable();
+    setAnalyzeBtn(false);
+    setArchiveBtn(false);
+    $('previewBody').className = 'preview-body empty';
+    $('previewBody').textContent = '选中左侧文件查看预览';
+    $('previewName').textContent = '（选中左侧文件后预览）';
+  }
+};
+
+$('scanBtn').onclick = async () => {
+  setScanBtn(false);
+  const r = await api.scan();
+  results = r.files;
+  renderTable();
+  setAnalyzeBtn(true);
+  setArchiveBtn(false);
+  setScanBtn(true);
+};
+
+$('analyzeBtn').onclick = async () => {
+  const r = await api.analyze();
+  if (r.ok) {
+    setAnalyzeBtn(false, '分析中...');
+    setScanBtn(false);
+    setArchiveBtn(false);
+  } else if (r.msg) {
+    alert(r.msg);
+  }
+};
+
+$('archiveBtn').onclick = async () => {
+  const selected = results.filter(it => it.selected);
+  if (!selected.length) { alert('没有选中任何文件'); return; }
+  const folders = new Set(selected.map(it => it.target_folder).filter(Boolean));
+  const noTarget = selected.filter(it => !it.target_folder).length;
+  let msg = '即将移动 ' + selected.length + ' 个文件到 ' + folders.size + ' 个文件夹。\n\n'
+          + '目标目录：' + currentFolder + '\n';
+  if (noTarget) msg += '\n注意：其中 ' + noTarget + ' 个文件未指定归属文件夹，将被跳过。\n';
+  msg += '\n确定执行归档吗？（执行后可用「撤销上次归档」还原）';
+  if (!confirm(msg)) return;
+  const keepName = $('keepNameCheck').checked;
+  const r = await api.archive(keepName);
+  if (r.ok) {
+    setArchiveBtn(false, '归档中...');
+  } else if (r.msg) {
+    alert(r.msg);
+  }
+};
+
+$('undoBtn').onclick = async () => {
+  if (!confirm('确定撤销上次归档？将把文件移回原位。')) return;
+  const r = await api.undo_archive();
+  if (r.ok) {
+    alert('已还原 ' + r.restored + ' 个文件' + (r.skipped ? '，跳过 ' + r.skipped + ' 个' : ''));
+    setUndoBtn(false);
+    const s = await api.scan();
+    results = s.files;
+    renderTable();
+    setAnalyzeBtn(true);
+    setArchiveBtn(false);
+  } else {
+    alert(r.msg || '撤销失败');
+  }
+};
+
+$('selectAllBtn').onclick = async () => {
+  await api.select_all();
+  results.forEach((it,i) => { it.selected = true; renderRow(i, it); });
+};
+$('deselectAllBtn').onclick = async () => {
+  await api.deselect_all();
+  results.forEach((it,i) => { it.selected = false; renderRow(i, it); });
+};
+
+$('openBtn').onclick = async () => {
+  if (selectedIdx < 0) { alert('请先选中一个文件'); return; }
+  const r = await api.open_file(results[selectedIdx].original_name);
+  if (!r.ok) alert('打开失败：' + r.msg);
+};
+
+$('searchBtn').onclick = async () => {
+  const q = $('searchInput').value.trim();
+  if (!q) { alert('请输入要搜索的内容'); return; }
+  const r = await api.search(q);
+  if (!r.ok) { if (r.msg) alert(r.msg); return; }
+  $('searchModal').classList.add('show');
+  $('searchList').innerHTML = '<div class="empty-tip">搜索中...</div>';
+};
+$('searchCloseBtn').onclick = () => $('searchModal').classList.remove('show');
+
+// 让弹窗可以拖动（按住标题栏拖动）
+function makeDraggable(modalEl, handleEl) {
+  let startX = 0, startY = 0, baseX = 0, baseY = 0, dragging = false;
+  const apply = (x, y) => { modalEl.style.transform = 'translate(' + x + 'px, ' + y + 'px)'; };
+  handleEl.addEventListener('mousedown', (e) => {
+    if (e.button !== 0) return;
+    dragging = true;
+    startX = e.clientX; startY = e.clientY;
+    baseX = modalEl._dx || 0; baseY = modalEl._dy || 0;
+    document.body.style.userSelect = 'none';
+    e.preventDefault();
+  });
+  document.addEventListener('mousemove', (e) => {
+    if (!dragging) return;
+    let dx = baseX + (e.clientX - startX);
+    let dy = baseY + (e.clientY - startY);
+    apply(dx, dy);
+    // 限制在视口内，保证标题栏始终可见
+    const r = modalEl.getBoundingClientRect();
+    const pad = 8;
+    if (r.left < pad) dx += pad - r.left;
+    if (r.right > window.innerWidth - pad) dx -= r.right - (window.innerWidth - pad);
+    if (r.top < pad) dy += pad - r.top;
+    if (r.bottom > window.innerHeight - pad) dy -= r.bottom - (window.innerHeight - pad);
+    apply(dx, dy);
+    modalEl._dx = dx; modalEl._dy = dy;
+  });
+  document.addEventListener('mouseup', () => {
+    if (!dragging) return;
+    dragging = false;
+    document.body.style.userSelect = '';
+  });
+}
+
+// 分类设置
+$('categoryBtn').onclick = async () => {
+  const cats = await api.get_categories();
+  $('categoryText').value = (cats.user || []).join('\n');
+  const ai = cats.ai || [];
+  $('aiCatsBox').textContent = ai.length
+    ? 'AI自动积累的分类：' + ai.slice(0,20).join('、') + (ai.length>20?` ...等${ai.length}个`:'')
+    : 'AI自动积累的分类：（暂无，跑过一轮分析后会自动积累）';
+  $('categoryModal').classList.add('show');
+};
+$('catCancelBtn').onclick = () => $('categoryModal').classList.remove('show');
+$('catSaveBtn').onclick = async () => {
+  const lines = $('categoryText').value.split('\n');
+  await api.set_user_categories(lines);
+  $('categoryModal').classList.remove('show');
+};
+
+// 分类设置弹窗：按住标题栏可拖动
+makeDraggable(document.querySelector('#categoryModal .modal'), document.querySelector('#categoryModal .drag-handle'));
+
+// API 设置
+let providerList = [];
+
+function currentProvider() {
+  return providerList.find(p => p.key === $('providerSelect').value) || null;
+}
+
+function fillProviderFields() {
+  const p = currentProvider();
+  if (!p) return;
+  $('apiBaseUrl').value = p.saved_base_url || p.preset_base_url || '';
+  $('apiModel').value = p.saved_model || p.preset_model || '';
+  $('apiBaseUrl').readOnly = (p.key !== 'custom');
+  $('apiKeyField').style.display = p.needs_key ? 'flex' : 'none';
+  $('apiKeyInput').value = '';
+  $('apiKeyInput').placeholder = p.has_key ? '已保存（留空则不修改）' : 'sk-...';
+  $('providerNote').textContent = p.note || '';
+}
+
+$('apiBtn').onclick = async () => {
+  const cfg = await api.get_provider_config();
+  providerList = cfg.providers || [];
+  $('providerSelect').innerHTML = providerList
+    .map(p => '<option value="' + esc(p.key) + '">' + esc(p.name) + '</option>').join('');
+  $('providerSelect').value = cfg.current;
+  fillProviderFields();
+  $('apiStatusBox').textContent = '当前状态：' + (cfg.configured ? '已配置' : '未配置');
+  $('apiModal').classList.add('show');
+};
+
+$('providerSelect').onchange = () => {
+  fillProviderFields();
+  $('apiStatusBox').textContent = '切换后点「保存」生效';
+};
+
+$('apiCancelBtn').onclick = () => $('apiModal').classList.remove('show');
+
+$('testConnBtn').onclick = async () => {
+  const p = currentProvider();
+  if (!p) return;
+  $('apiStatusBox').textContent = '正在测试连接...';
+  if (p.local) {
+    const c = await api.check_local_model($('apiBaseUrl').value.trim());
+    if (!c.running) { $('apiStatusBox').textContent = '✗ ' + c.msg; return; }
+    pushLog('本地模型：' + c.msg);
+  }
+  const r = await api.test_connection(
+    p.key, $('apiBaseUrl').value.trim(), $('apiModel').value.trim(), $('apiKeyInput').value.trim());
+  $('apiStatusBox').textContent = (r.ok ? '✓ ' : '✗ ') + r.msg;
+};
+
+$('apiSaveBtn').onclick = async () => {
+  const p = currentProvider();
+  if (!p) return;
+  const r = await api.set_provider_config(
+    p.key, $('apiBaseUrl').value.trim(), $('apiModel').value.trim(), $('apiKeyInput').value.trim());
+  if (!r.ok) { alert(r.msg || '保存失败'); return; }
+  $('apiModal').classList.remove('show');
+  pushLog('已切换服务商：' + p.name);
+  if (!r.configured) {
+    alert('已保存，但这个服务商还没配齐（缺 Key 或地址），AI 功能暂时不可用。');
+  }
+};
+
+// API 设置弹窗也可拖动
+makeDraggable(document.querySelector('#apiModal .modal'), document.querySelector('#apiModal .drag-handle'));
+</script>
+</body>
+</html>

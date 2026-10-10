@@ -1,0 +1,30 @@
+# ==== 本地配置 / 用户数据（绝不提交）====
+config.json
+.env
+categories_history.json
+last_archive.json
+.fileai/
+
+# ==== Python ====
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# ==== 打包产物 ====
+dist/
+build/
+*.spec
+
+# ==== 编辑器 / 系统 ====
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# ==== 旧版本 / 个人文件（含明文 API Key，勿提交）====
+# 若要纳入仓库，请先把其中的 API Key 也改为从配置读取
+桌面文件AI整理工具-原版.py
+桌面文件AI整理工具.py
